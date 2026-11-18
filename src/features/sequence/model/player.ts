@@ -1,52 +1,58 @@
 import { onUnmounted } from "vue";
 import type { Document } from "../../../shared/types";
-import { interpolate } from "../lib/steps";
+import {
+  requestStep,
+  resumeTransition,
+  stopTransitionLoop,
+} from "./transition";
+
+const EPS = 1e-4;
+
 export function usePlayer(doc: Document) {
-  let frame = 0,
-    last = 0,
-    elapsed = 0,
-    start: Record<string, number> = {},
-    target = 0;
-  function tick(now: number) {
-    if (!doc.playing) {
-      last = 0;
+  const lastIndex = () => doc.steps.length - 1;
+
+  function play() {
+    const tr = doc.transition;
+    if (tr && tr.progress < 1 - EPS && !tr.arrived) {
+      // 过渡尚未走完：从当前进度继续。
+      doc.playing = true;
+      resumeTransition(doc);
       return;
     }
-    if (!last) {
-      last = now;
-      start = { ...doc.angles };
-      target = (doc.step + 1) % doc.steps.length;
-      elapsed = 0;
+    if (tr && tr.plan.blocked) {
+      // 受限停留：沿用当前可操作姿态重新试一次，画面会再次停在限位处。
+      requestStep(doc, tr.target, { autoPlay: true });
+      doc.playing = false;
+      return;
     }
-    elapsed += (now - last) * doc.speed;
-    last = now;
-    const step = doc.steps[target]!;
-    doc.angles = interpolate(
-      start,
-      step.angles,
-      Math.min(1, elapsed / step.duration),
-    );
-    if (elapsed >= step.duration) {
-      doc.step = target;
-      const c = doc.paper.creases[target - 1];
-      if (c) doc.selected = c.id;
-      if (target === doc.steps.length - 1) {
-        doc.playing = false;
-        last = 0;
-        return;
-      }
-      start = { ...doc.angles };
-      target++;
-      elapsed = 0;
+    if (tr) {
+      // 已到达某个已保存步骤：清理检视滑杆，从这一步继续链式播放。
+      doc.transition = null;
     }
-    frame = requestAnimationFrame(tick);
+    if (doc.step >= lastIndex()) {
+      // 从成品反向回放：走完整条教学路径后停在起点。
+      requestStep(doc, 0, { autoPlay: true, keepPlaying: false });
+      doc.playing = false;
+      return;
+    }
+    doc.playing = true;
+    requestStep(doc, Math.min(doc.step + 1, lastIndex()), {
+      autoPlay: true,
+      keepPlaying: true,
+    });
+    if (!doc.transition?.playing) doc.playing = false;
   }
+
+  function pause() {
+    doc.playing = false;
+    if (doc.transition) doc.transition.playing = false;
+  }
+
   function toggle() {
-    doc.playing = !doc.playing;
-    cancelAnimationFrame(frame);
-    last = 0;
-    if (doc.playing) frame = requestAnimationFrame(tick);
+    if (doc.playing || doc.transition?.playing) pause();
+    else play();
   }
-  onUnmounted(() => cancelAnimationFrame(frame));
-  return { toggle };
+
+  onUnmounted(stopTransitionLoop);
+  return { toggle, play, pause };
 }

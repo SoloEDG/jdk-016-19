@@ -29,6 +29,7 @@ import {
   seek,
   captureStep,
   usePlayer,
+  stopTransitionLoop,
 } from "../features/sequence";
 import { Viewport, ObservePanel, setView } from "../features/observe";
 const doc = reactive(createDocument(papers[0]!, makeSteps(papers[0]!)));
@@ -51,13 +52,23 @@ function choosePaper(id: string) {
 }
 function reset() {
   flatten(doc);
+  stopTransitionLoop();
   doc.steps = makeSteps(doc.paper);
   setView(doc, "iso");
   notify("已回到平展纸张");
 }
 function capture() {
-  captureStep(doc);
-  notify("当前形态已保存到步骤 " + (doc.step + 1));
+  const index = captureStep(doc);
+  if (index === null) return;
+  notify("当前形态已保存到步骤 " + (index + 1));
+}
+function showFinished() {
+  const index = doc.steps.length - 1;
+  if (doc.step === index && !doc.transition) {
+    notify("已在成品形态");
+    return;
+  }
+  seek(doc, index);
 }
 </script>
 <template>
@@ -76,7 +87,7 @@ function capture() {
           <HelpCircle :size="18" /></button
         ><button class="reset" @click="reset">
           <RotateCcw :size="14" />重新开始</button
-        ><button class="primary" @click="seek(doc, doc.steps.length - 1)">
+        ><button class="primary" @click="showFinished">
           观察成品 <ArrowUpRight :size="15" />
         </button>
       </div>
@@ -172,7 +183,11 @@ function capture() {
           选择纸张与颜色，点选折痕后拖动角度滑杆。父纸面转动时，关联纸面会一起运动。
         </p>
         <p>
-          下方步骤可还原对应形态，也可保存当前角度后播放。拖动画面旋转视角，滚轮缩放，下载按钮可保存当前观察图。
+          下方步骤不会瞬移：点选后纸张会从当前形态过渡过去。拖动过渡滑杆可观察两种折法之间的变化，
+          途中改选其他步骤会从眼前形态重新出发；也可切换「教学路径 / 最短路径」，若角度限制导致无法直达，画面会停在可继续操作的位置。
+        </p>
+        <p>
+          播放途中开始过渡时，过渡以眼前的临时姿态为起点；中断后保存记录的是画面中的真实形态。拖动画面旋转视角，滚轮缩放，下载按钮可保存当前观察图。
         </p>
         <p>作品保留在本次会话中，刷新会重新开始。</p>
         <button class="primary" @click="help = false">开始探索 ↗</button>

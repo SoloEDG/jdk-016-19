@@ -1,11 +1,13 @@
 import type { Document } from "../../../shared/types";
 import { normalizeAngle } from "../lib/angle";
+import { cancelTransition } from "../../sequence/model/transition";
 export function changeAngle(doc: Document, value: number) {
+  cancelTransition(doc);
   doc.playing = false;
   doc.angles[doc.selected] = normalizeAngle(value);
 }
 export function flatten(doc: Document) {
-  doc.playing = false;
+  cancelTransition(doc);
   doc.angles = {};
   doc.step = 0;
 }

@@ -1,5 +1,8 @@
 import type { Document, Paper } from "../../../shared/types";
+import { cancelTransition, stopTransitionLoop } from "../../sequence/model/transition";
 export function replacePaper(doc: Document, paper: Paper) {
+  cancelTransition(doc);
+  stopTransitionLoop();
   doc.paper = paper;
   doc.angles = {};
   doc.selected = paper.creases[0]?.id ?? "";

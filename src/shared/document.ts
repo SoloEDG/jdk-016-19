@@ -12,6 +12,8 @@ export function createDocument(paper: Paper, steps: Step[]): Document {
     step: 1,
     playing: false,
     speed: 1,
+    transitionMode: "path",
+    transition: null,
     view: { yaw: -35, pitch: 50, zoom: 1, grid: true, wire: true },
   };
 }
